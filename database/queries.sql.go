@@ -7,7 +7,6 @@ package database
 
 import (
 	"context"
-	"database/sql"
 	"time"
 )
 
@@ -43,7 +42,7 @@ select id, user, description, category, amount, created_date from expenses
 where user = ?
 `
 
-func (q *Queries) GetExpenses(ctx context.Context, user sql.NullString) ([]Expense, error) {
+func (q *Queries) GetExpenses(ctx context.Context, user string) ([]Expense, error) {
 	rows, err := q.db.QueryContext(ctx, getExpenses, user)
 	if err != nil {
 		return nil, err
@@ -79,8 +78,8 @@ where category = ? and user = ?
 `
 
 type GetExpensesByCategoryParams struct {
-	Category sql.NullString
-	User     sql.NullString
+	Category string
+	User     string
 }
 
 func (q *Queries) GetExpensesByCategory(ctx context.Context, arg GetExpensesByCategoryParams) ([]Expense, error) {
@@ -120,7 +119,7 @@ where created_date >= ? and user = ?
 
 type GetExpensesByDateParams struct {
 	CreatedDate time.Time
-	User        sql.NullString
+	User        string
 }
 
 func (q *Queries) GetExpensesByDate(ctx context.Context, arg GetExpensesByDateParams) ([]Expense, error) {
@@ -160,8 +159,8 @@ where created_date >= ? and category = ? and user = ?
 
 type GetExpensesByDateAndCategoryParams struct {
 	CreatedDate time.Time
-	Category    sql.NullString
-	User        sql.NullString
+	Category    string
+	User        string
 }
 
 func (q *Queries) GetExpensesByDateAndCategory(ctx context.Context, arg GetExpensesByDateAndCategoryParams) ([]Expense, error) {
@@ -228,8 +227,8 @@ returning id
 `
 
 type InsertExpenseParams struct {
-	User        sql.NullString
-	Category    sql.NullString
+	User        string
+	Category    string
 	Amount      float64
 	Description string
 }
@@ -272,7 +271,7 @@ where id = ?
 `
 
 type UpdateExpenseParams struct {
-	Category    sql.NullString
+	Category    string
 	Amount      float64
 	Description string
 	ID          int64

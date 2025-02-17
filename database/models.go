@@ -5,7 +5,6 @@
 package database
 
 import (
-	"database/sql"
 	"time"
 )
 
@@ -15,9 +14,9 @@ type Category struct {
 
 type Expense struct {
 	ID          int64
-	User        sql.NullString
+	User        string
 	Description string
-	Category    sql.NullString
+	Category    string
 	Amount      float64
 	CreatedDate time.Time
 }

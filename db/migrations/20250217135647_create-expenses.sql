@@ -16,9 +16,9 @@ insert into categories (category) values
 
  create table expenses (
    id integer primary key,
-   user text references users(name),
+   user text references users(name) not null,
    description text not null,
-   category text references categories(category),
+   category text references categories(category) not null,
    amount decimal not null,
    created_date date not null default current_date
  );
