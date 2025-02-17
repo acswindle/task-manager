@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/acswindle/task-manager/database"
 )
@@ -53,10 +54,29 @@ func ExpenseRoutes(ctx context.Context, queries *database.Queries) {
 		}
 		// TODO: Add Category Check
 		category := r.URL.Query().Get("category")
-		var payload []byte
-		var expenses []database.Expense
+		date := r.URL.Query().Get("date")
+		var filterDate time.Time
 		var err error
-		if category != "" {
+		if date != "" {
+			filterDate, err = time.Parse("2006-01-02", date)
+			if err != nil {
+				http.Error(w, "invalid date, must be YYYY-MM-DD format", http.StatusBadRequest)
+				return
+			}
+		}
+		var expenses []database.Expense
+		if category != "" && date != "" {
+			expenses, err = queries.GetExpensesByDateAndCategory(ctx, database.GetExpensesByDateAndCategoryParams{
+				User:        username,
+				Category:    category,
+				CreatedDate: filterDate,
+			})
+		} else if date != "" {
+			expenses, err = queries.GetExpensesByDate(ctx, database.GetExpensesByDateParams{
+				User:        username,
+				CreatedDate: filterDate,
+			})
+		} else if category != "" {
 			expenses, err = queries.GetExpensesByCategory(ctx, database.GetExpensesByCategoryParams{
 				User:     username,
 				Category: category,
@@ -68,6 +88,7 @@ func ExpenseRoutes(ctx context.Context, queries *database.Queries) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		var payload []byte
 		payload, err = json.Marshal(expenses)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -75,5 +96,24 @@ func ExpenseRoutes(ctx context.Context, queries *database.Queries) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(payload)
+	})
+
+	http.HandleFunc("DELETE /api/expense/{id}", func(w http.ResponseWriter, r *http.Request) {
+		idStr := r.PathValue("id")
+		id, err := strconv.ParseInt(idStr, 10, 64)
+		if err != nil {
+			http.Error(w, "invalid id, must be an integer", http.StatusBadRequest)
+			return
+		}
+		username := ValidateToken(w, r)
+		if username == "" {
+			return
+		}
+		err = queries.DeleteExpense(ctx, id)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
 	})
 }
