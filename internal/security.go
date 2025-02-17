@@ -63,24 +63,42 @@ func genrateJWT(username string) (ResponseToken, error) {
 	}, nil
 }
 
-func validateToken(token string) (string, error) {
+func ValidateToken(w http.ResponseWriter, r *http.Request) string {
 	jwtSecret, secretSet := os.LookupEnv("JWT_SECRET")
 	if !secretSet {
-		return "", fmt.Errorf("JWT_SECRET not set")
+		http.Error(w, "JWT_SECRET not set", http.StatusInternalServerError)
+		return ""
 	}
-	tokenClaims, err := jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {
+	auth := r.Header.Get("Authorization")
+	if auth == "" {
+		http.Error(w, "token not set", http.StatusUnauthorized)
+		return ""
+	}
+	token := strings.Split(auth, " ")
+	if token[0] != "Bearer" {
+		http.Error(w, "token not set", http.StatusUnauthorized)
+		return ""
+	}
+	if len(token) != 2 {
+		http.Error(w, "token not set", http.StatusUnauthorized)
+		return ""
+	}
+
+	tokenClaims, err := jwt.Parse(token[1], func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
 		return []byte(jwtSecret), nil
 	})
 	if err != nil {
-		return "", err
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return ""
 	}
 	if claims, ok := tokenClaims.Claims.(jwt.MapClaims); ok && tokenClaims.Valid {
-		return claims["username"].(string), nil
+		return claims["username"].(string)
 	}
-	return "", fmt.Errorf("invalid token")
+	http.Error(w, "token not valid", http.StatusUnauthorized)
+	return ""
 }
 
 func SecurityRoutes(ctx context.Context, queries *database.Queries) {
@@ -125,7 +143,7 @@ func SecurityRoutes(ctx context.Context, queries *database.Queries) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		fmt.Fprintf(w, "Inserted user with id %d\n", id)
+		fmt.Fprintf(w, "Inserted user with id %s\n", id)
 	})
 	http.HandleFunc("/oauth2/token", func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
@@ -166,25 +184,8 @@ func SecurityRoutes(ctx context.Context, queries *database.Queries) {
 		w.Write(response)
 	})
 	http.HandleFunc("GET /validate", func(w http.ResponseWriter, r *http.Request) {
-		auth := r.Header.Get("Authorization")
-		if auth == "" {
-			http.Error(w, "token not set", http.StatusUnauthorized)
-			return
+		if username := ValidateToken(w, r); username != "" {
+			fmt.Fprint(w, username)
 		}
-		token := strings.Split(auth, " ")
-		if token[0] != "Bearer" {
-			http.Error(w, "token not set", http.StatusUnauthorized)
-			return
-		}
-		if len(token) != 2 {
-			http.Error(w, "token not set", http.StatusUnauthorized)
-			return
-		}
-		username, err := validateToken(token[1])
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusUnauthorized)
-			return
-		}
-		fmt.Fprint(w, username)
 	})
 }
