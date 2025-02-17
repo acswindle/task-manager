@@ -21,15 +21,24 @@ POST http://localhost:8080/api/expense
 Content-Type: application/x-www-form-urlencoded
 Authorization: Bearer {{LOGIN.response.body.access_token}}
 
-amount=100
-&description=Test
-&category=Groceries
+amount=2000
+&description=HomeInsurance
+&category=Insurance
 
 ###
 GET http://localhost:8080/api/expenses
 Authorization: Bearer {{LOGIN.response.body.access_token}}
 
 ###
-GET http://localhost:8080/api/expenses?category=Groceries
+GET http://localhost:8080/api/expenses?category=Insurance
+Authorization: Bearer {{LOGIN.response.body.access_token}}
+
+###
+GET http://localhost:8080/api/expenses?date=2025-02-17
+&category=Groceries
+Authorization: Bearer {{LOGIN.response.body.access_token}}
+
+###
+DELETE http://localhost:8080/api/expense/6
 Authorization: Bearer {{LOGIN.response.body.access_token}}
 
