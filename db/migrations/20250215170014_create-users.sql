@@ -1,7 +1,6 @@
 -- migrate:up
 create table users (
-  id integer primary key,
-  name text not null unique,
+  name text primary key,
   salt blob not null,
   hashpassword blob not null
 );

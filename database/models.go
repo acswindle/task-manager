@@ -4,8 +4,25 @@
 
 package database
 
+import (
+	"database/sql"
+	"time"
+)
+
+type Category struct {
+	Category string
+}
+
+type Expense struct {
+	ID          int64
+	User        sql.NullString
+	Description string
+	Category    sql.NullString
+	Amount      float64
+	CreatedDate time.Time
+}
+
 type User struct {
-	ID           int64
 	Name         string
 	Salt         []byte
 	Hashpassword []byte

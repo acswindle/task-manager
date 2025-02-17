@@ -7,7 +7,19 @@ package database
 
 import (
 	"context"
+	"database/sql"
+	"time"
 )
+
+const deleteExpense = `-- name: DeleteExpense :exec
+delete from expenses
+where id = ?
+`
+
+func (q *Queries) DeleteExpense(ctx context.Context, id int64) error {
+	_, err := q.db.ExecContext(ctx, deleteExpense, id)
+	return err
+}
 
 const getCredentials = `-- name: GetCredentials :one
 select salt, hashpassword from users
@@ -26,24 +38,27 @@ func (q *Queries) GetCredentials(ctx context.Context, name string) (GetCredentia
 	return i, err
 }
 
-const getUsers = `-- name: GetUsers :many
-select id, name, salt, hashpassword from users
+const getExpenses = `-- name: GetExpenses :many
+select id, user, description, category, amount, created_date from expenses
+where user = ?
 `
 
-func (q *Queries) GetUsers(ctx context.Context) ([]User, error) {
-	rows, err := q.db.QueryContext(ctx, getUsers)
+func (q *Queries) GetExpenses(ctx context.Context, user sql.NullString) ([]Expense, error) {
+	rows, err := q.db.QueryContext(ctx, getExpenses, user)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []User
+	var items []Expense
 	for rows.Next() {
-		var i User
+		var i Expense
 		if err := rows.Scan(
 			&i.ID,
-			&i.Name,
-			&i.Salt,
-			&i.Hashpassword,
+			&i.User,
+			&i.Description,
+			&i.Category,
+			&i.Amount,
+			&i.CreatedDate,
 		); err != nil {
 			return nil, err
 		}
@@ -58,10 +73,183 @@ func (q *Queries) GetUsers(ctx context.Context) ([]User, error) {
 	return items, nil
 }
 
+const getExpensesByCategory = `-- name: GetExpensesByCategory :many
+select id, user, description, category, amount, created_date from expenses
+where category = ? and user = ?
+`
+
+type GetExpensesByCategoryParams struct {
+	Category sql.NullString
+	User     sql.NullString
+}
+
+func (q *Queries) GetExpensesByCategory(ctx context.Context, arg GetExpensesByCategoryParams) ([]Expense, error) {
+	rows, err := q.db.QueryContext(ctx, getExpensesByCategory, arg.Category, arg.User)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Expense
+	for rows.Next() {
+		var i Expense
+		if err := rows.Scan(
+			&i.ID,
+			&i.User,
+			&i.Description,
+			&i.Category,
+			&i.Amount,
+			&i.CreatedDate,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getExpensesByDate = `-- name: GetExpensesByDate :many
+select id, user, description, category, amount, created_date from expenses
+where created_date >= ? and user = ?
+`
+
+type GetExpensesByDateParams struct {
+	CreatedDate time.Time
+	User        sql.NullString
+}
+
+func (q *Queries) GetExpensesByDate(ctx context.Context, arg GetExpensesByDateParams) ([]Expense, error) {
+	rows, err := q.db.QueryContext(ctx, getExpensesByDate, arg.CreatedDate, arg.User)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Expense
+	for rows.Next() {
+		var i Expense
+		if err := rows.Scan(
+			&i.ID,
+			&i.User,
+			&i.Description,
+			&i.Category,
+			&i.Amount,
+			&i.CreatedDate,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getExpensesByDateAndCategory = `-- name: GetExpensesByDateAndCategory :many
+select id, user, description, category, amount, created_date from expenses
+where created_date >= ? and category = ? and user = ?
+`
+
+type GetExpensesByDateAndCategoryParams struct {
+	CreatedDate time.Time
+	Category    sql.NullString
+	User        sql.NullString
+}
+
+func (q *Queries) GetExpensesByDateAndCategory(ctx context.Context, arg GetExpensesByDateAndCategoryParams) ([]Expense, error) {
+	rows, err := q.db.QueryContext(ctx, getExpensesByDateAndCategory, arg.CreatedDate, arg.Category, arg.User)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Expense
+	for rows.Next() {
+		var i Expense
+		if err := rows.Scan(
+			&i.ID,
+			&i.User,
+			&i.Description,
+			&i.Category,
+			&i.Amount,
+			&i.CreatedDate,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getUsers = `-- name: GetUsers :many
+select name, salt, hashpassword from users
+`
+
+func (q *Queries) GetUsers(ctx context.Context) ([]User, error) {
+	rows, err := q.db.QueryContext(ctx, getUsers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []User
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(&i.Name, &i.Salt, &i.Hashpassword); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const insertExpense = `-- name: InsertExpense :one
+insert into expenses (user, category, amount, description)
+values (?, ?, ?, ?)
+returning id
+`
+
+type InsertExpenseParams struct {
+	User        sql.NullString
+	Category    sql.NullString
+	Amount      float64
+	Description string
+}
+
+func (q *Queries) InsertExpense(ctx context.Context, arg InsertExpenseParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, insertExpense,
+		arg.User,
+		arg.Category,
+		arg.Amount,
+		arg.Description,
+	)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
 const insertUser = `-- name: InsertUser :one
 insert into users (name, salt, hashpassword)
 values (?, ?, ?)
-returning id
+returning name
 `
 
 type InsertUserParams struct {
@@ -70,9 +258,32 @@ type InsertUserParams struct {
 	Hashpassword []byte
 }
 
-func (q *Queries) InsertUser(ctx context.Context, arg InsertUserParams) (int64, error) {
+func (q *Queries) InsertUser(ctx context.Context, arg InsertUserParams) (string, error) {
 	row := q.db.QueryRowContext(ctx, insertUser, arg.Name, arg.Salt, arg.Hashpassword)
-	var id int64
-	err := row.Scan(&id)
-	return id, err
+	var name string
+	err := row.Scan(&name)
+	return name, err
+}
+
+const updateExpense = `-- name: UpdateExpense :exec
+update expenses
+set category = ?, amount = ?, description = ?
+where id = ?
+`
+
+type UpdateExpenseParams struct {
+	Category    sql.NullString
+	Amount      float64
+	Description string
+	ID          int64
+}
+
+func (q *Queries) UpdateExpense(ctx context.Context, arg UpdateExpenseParams) error {
+	_, err := q.db.ExecContext(ctx, updateExpense,
+		arg.Category,
+		arg.Amount,
+		arg.Description,
+		arg.ID,
+	)
+	return err
 }
