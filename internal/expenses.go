@@ -2,8 +2,7 @@ package internal
 
 import (
 	"context"
-	"database/sql"
-	"fmt"
+	"encoding/json"
 	"net/http"
 	"strconv"
 
@@ -11,7 +10,6 @@ import (
 )
 
 func ExpenseRoutes(ctx context.Context, queries *database.Queries) {
-	// GET /users
 	http.HandleFunc("POST /api/expense", func(w http.ResponseWriter, r *http.Request) {
 		err := r.ParseForm()
 		if err != nil {
@@ -35,16 +33,47 @@ func ExpenseRoutes(ctx context.Context, queries *database.Queries) {
 			return
 		}
 		id, err := queries.InsertExpense(ctx, database.InsertExpenseParams{
-			User:        sql.NullString{String: username, Valid: true},
+			User:        username,
 			Amount:      amount_f,
 			Description: description,
-			Category:    sql.NullString{String: category, Valid: true},
+			Category:    category,
 		})
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		w.WriteHeader(http.StatusCreated)
-		fmt.Fprintf(w, "Expense created with id %d", id)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte("{\"id\": " + strconv.Itoa(int(id)) + "}"))
+	})
+
+	http.HandleFunc("GET /api/expenses", func(w http.ResponseWriter, r *http.Request) {
+		username := ValidateToken(w, r)
+		if username == "" {
+			return
+		}
+		// TODO: Add Category Check
+		category := r.URL.Query().Get("category")
+		var payload []byte
+		var expenses []database.Expense
+		var err error
+		if category != "" {
+			expenses, err = queries.GetExpensesByCategory(ctx, database.GetExpensesByCategoryParams{
+				User:     username,
+				Category: category,
+			})
+		} else {
+			expenses, err = queries.GetExpenses(ctx, username)
+		}
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		payload, err = json.Marshal(expenses)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(payload)
 	})
 }
