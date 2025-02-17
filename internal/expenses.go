@@ -116,4 +116,43 @@ func ExpenseRoutes(ctx context.Context, queries *database.Queries) {
 		}
 		w.WriteHeader(http.StatusOK)
 	})
+	http.HandleFunc("PATCH /api/expense/{id}", func(w http.ResponseWriter, r *http.Request) {
+		idStr := r.PathValue("id")
+		id, err := strconv.ParseInt(idStr, 10, 64)
+		if err != nil {
+			http.Error(w, "invalid id, must be an integer", http.StatusBadRequest)
+			return
+		}
+		username := ValidateToken(w, r)
+		if username == "" {
+			return
+		}
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		amount := r.FormValue("amount")
+		description := r.FormValue("description")
+		category := r.FormValue("category")
+		if amount == "" || description == "" || category == "" {
+			http.Error(w, "amount, description, and category are required", http.StatusBadRequest)
+			return
+		}
+		amount_f, err := strconv.ParseFloat(amount, 64)
+		if err != nil {
+			http.Error(w, "invalid amount", http.StatusBadRequest)
+			return
+		}
+		err = queries.UpdateExpense(ctx, database.UpdateExpenseParams{
+			ID:          id,
+			Amount:      amount_f,
+			Description: description,
+			Category:    category,
+		})
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
 }

@@ -30,15 +30,23 @@ GET http://localhost:8080/api/expenses
 Authorization: Bearer {{LOGIN.response.body.access_token}}
 
 ###
-GET http://localhost:8080/api/expenses?category=Insurance
+GET http://localhost:8080/api/expenses?category=Other
 Authorization: Bearer {{LOGIN.response.body.access_token}}
 
 ###
 GET http://localhost:8080/api/expenses?date=2025-02-17
-&category=Groceries
+&category=Other
 Authorization: Bearer {{LOGIN.response.body.access_token}}
 
 ###
 DELETE http://localhost:8080/api/expense/6
 Authorization: Bearer {{LOGIN.response.body.access_token}}
 
+###
+PATCH http://localhost:8080/api/expense/5
+Content-Type: application/x-www-form-urlencoded
+Authorization: Bearer {{LOGIN.response.body.access_token}}
+
+amount=2.99
+&description=Stuff
+&category=Other
