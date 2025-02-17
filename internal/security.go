@@ -3,12 +3,18 @@ package internal
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"strconv"
+	"strings"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/acswindle/task-manager/database"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 func generateSalt() ([]byte, error) {
@@ -17,6 +23,64 @@ func generateSalt() ([]byte, error) {
 		return nil, err
 	}
 	return salt, nil
+}
+
+type ResponseToken struct {
+	Token   string `json:"access_token"`
+	Type    string `json:"token_type"`
+	Expires int    `json:"expires_in"`
+}
+
+func genrateJWT(username string) (ResponseToken, error) {
+	jwtSecret, secretSet := os.LookupEnv("JWT_SECRET")
+	if !secretSet {
+		return ResponseToken{}, fmt.Errorf("JWT_SECRET not set")
+	}
+	jwtExpireTime, setExp := os.LookupEnv("JWT_EXPIRE_TIME")
+	if !setExp {
+		return ResponseToken{}, fmt.Errorf("JWT_EXPIRE_TIME not set")
+	}
+	expireTime, err := strconv.Atoi(jwtExpireTime)
+	if err != nil {
+		return ResponseToken{}, fmt.Errorf("JWT_EXPIRE_TIME must be an integer")
+	}
+	expireTime = expireTime * 3600
+	claims := jwt.MapClaims{
+		"username":   username,
+		"exp":        time.Now().Add(time.Second * time.Duration(expireTime)).Unix(),
+		"iat":        time.Now().Unix(),
+		"authorized": true,
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString([]byte(jwtSecret))
+	if err != nil {
+		return ResponseToken{}, fmt.Errorf("failed to generate JWT token: %v", err)
+	}
+	return ResponseToken{
+		Token:   tokenString,
+		Type:    "Bearer",
+		Expires: expireTime,
+	}, nil
+}
+
+func validateToken(token string) (string, error) {
+	jwtSecret, secretSet := os.LookupEnv("JWT_SECRET")
+	if !secretSet {
+		return "", fmt.Errorf("JWT_SECRET not set")
+	}
+	tokenClaims, err := jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return []byte(jwtSecret), nil
+	})
+	if err != nil {
+		return "", err
+	}
+	if claims, ok := tokenClaims.Claims.(jwt.MapClaims); ok && tokenClaims.Valid {
+		return claims["username"].(string), nil
+	}
+	return "", fmt.Errorf("invalid token")
 }
 
 func SecurityRoutes(ctx context.Context, queries *database.Queries) {
@@ -68,5 +132,59 @@ func SecurityRoutes(ctx context.Context, queries *database.Queries) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		if r.Form.Get("grant_type") != "password" {
+			http.Error(w, "grant_type must be password", http.StatusBadRequest)
+			return
+		}
+		username := r.Form.Get("username")
+		password := r.Form.Get("password")
+		if username == "" || password == "" {
+			http.Error(w, "username or password not set", http.StatusBadRequest)
+			return
+		}
+		user, err := queries.GetCredentials(ctx, username)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if err := bcrypt.CompareHashAndPassword(user.Hashpassword, append([]byte(password), user.Salt...)); err != nil {
+			http.Error(w, err.Error(), http.StatusUnauthorized)
+			return
+		}
+		token, err := genrateJWT(username)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		response, err := json.Marshal(token)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Cache-Control", "no-store")
+		w.Write(response)
+	})
+	http.HandleFunc("GET /validate", func(w http.ResponseWriter, r *http.Request) {
+		auth := r.Header.Get("Authorization")
+		if auth == "" {
+			http.Error(w, "token not set", http.StatusUnauthorized)
+			return
+		}
+		token := strings.Split(auth, " ")
+		if token[0] != "Bearer" {
+			http.Error(w, "token not set", http.StatusUnauthorized)
+			return
+		}
+		if len(token) != 2 {
+			http.Error(w, "token not set", http.StatusUnauthorized)
+			return
+		}
+		username, err := validateToken(token[1])
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusUnauthorized)
+			return
+		}
+		fmt.Fprint(w, username)
 	})
 }
