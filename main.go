@@ -23,6 +23,7 @@ func setup() (context.Context, *database.Queries, error) {
 			errors.New("DATABASE_FILE env variable not set")
 	}
 	db, err := sql.Open("sqlite3", dbfilename)
+	db.ExecContext(ctx, "PRAGMA foreign_keys = ON;", nil)
 	if err != nil {
 		return nil, &database.Queries{}, err
 	}
@@ -46,6 +47,7 @@ func main() {
 		fmt.Fprint(w, "Writing from Go Server")
 	})
 	internal.SecurityRoutes(ctx, queries)
+	internal.ExpenseRoutes(ctx, queries)
 
 	fmt.Printf("Listening on port %s\n", port)
 	http.ListenAndServe(fmt.Sprintf(":%s", port), nil)
