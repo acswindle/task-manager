@@ -9,8 +9,25 @@ import (
 	"context"
 )
 
+const getCredentials = `-- name: GetCredentials :one
+select salt, hashpassword from users
+where name = ?
+`
+
+type GetCredentialsRow struct {
+	Salt         []byte
+	Hashpassword []byte
+}
+
+func (q *Queries) GetCredentials(ctx context.Context, name string) (GetCredentialsRow, error) {
+	row := q.db.QueryRowContext(ctx, getCredentials, name)
+	var i GetCredentialsRow
+	err := row.Scan(&i.Salt, &i.Hashpassword)
+	return i, err
+}
+
 const getUsers = `-- name: GetUsers :many
-select id, name from users
+select id, name, salt, hashpassword from users
 `
 
 func (q *Queries) GetUsers(ctx context.Context) ([]User, error) {
@@ -22,7 +39,12 @@ func (q *Queries) GetUsers(ctx context.Context) ([]User, error) {
 	var items []User
 	for rows.Next() {
 		var i User
-		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Salt,
+			&i.Hashpassword,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -37,13 +59,19 @@ func (q *Queries) GetUsers(ctx context.Context) ([]User, error) {
 }
 
 const insertUser = `-- name: InsertUser :one
-insert into users (name)
-values (?)
+insert into users (name, salt, hashpassword)
+values (?, ?, ?)
 returning id
 `
 
-func (q *Queries) InsertUser(ctx context.Context, name string) (int64, error) {
-	row := q.db.QueryRowContext(ctx, insertUser, name)
+type InsertUserParams struct {
+	Name         string
+	Salt         []byte
+	Hashpassword []byte
+}
+
+func (q *Queries) InsertUser(ctx context.Context, arg InsertUserParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, insertUser, arg.Name, arg.Salt, arg.Hashpassword)
 	var id int64
 	err := row.Scan(&id)
 	return id, err

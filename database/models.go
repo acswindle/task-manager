@@ -5,6 +5,8 @@
 package database
 
 type User struct {
-	ID   int64
-	Name string
+	ID           int64
+	Name         string
+	Salt         []byte
+	Hashpassword []byte
 }
