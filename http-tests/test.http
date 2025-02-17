@@ -17,7 +17,19 @@ GET http://localhost:8080/validate
 Authorization: Bearer {{LOGIN.response.body.access_token}}
 
 ###
-POST http://localhost:8080/api/expense?amount=100
+POST http://localhost:8080/api/expense
+Content-Type: application/x-www-form-urlencoded
+Authorization: Bearer {{LOGIN.response.body.access_token}}
+
+amount=100
 &description=Test
 &category=Groceries
+
+###
+GET http://localhost:8080/api/expenses
 Authorization: Bearer {{LOGIN.response.body.access_token}}
+
+###
+GET http://localhost:8080/api/expenses?category=Groceries
+Authorization: Bearer {{LOGIN.response.body.access_token}}
+
