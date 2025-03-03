@@ -1,0 +1,15 @@
+version: '3'
+
+services:
+  app:
+    image: acswindle09/go-expense-tracker-api:0.0.1
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./db/task-manager.sqlite3:/app/db/task-manager.sqlite3
+    environment:
+      DATABASE_FILE: ${DATABASE_FILE}
+      APP_PORT: ${APP_PORT}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRE_TIME: ${JWT_EXPIRE_TIME}
+
