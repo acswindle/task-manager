@@ -1,0 +1,59 @@
+@hostname=54.172.105.54
+@port=80
+@host={{hostname}:{{port}}
+
+#
+POST http://{{hostname}}:{{port}}/user?username=testuser
+&password=secret
+
+#
+GET http://{{hostname}}:{{port}}
+
+###
+# @name LOGIN
+POST http://{{hostname}}:{{port}}/oauth2/token
+Content-Type: application/x-www-form-urlencoded
+
+username=testuser
+&password=secret
+&grant_type=password
+
+### 
+
+GET http://{{hostname}}:{{port}}/validate
+Authorization: Bearer {{LOGIN.response.body.access_token}}
+
+###
+POST http://{{hostname}}:{{port}}/api/expense
+Content-Type: application/x-www-form-urlencoded
+Authorization: Bearer {{LOGIN.response.body.access_token}}
+
+amount=2000
+&description=HomeInsurance
+&category=Insurance
+
+###
+GET http://{{hostname}}:{{port}}/api/expenses
+Authorization: Bearer {{LOGIN.response.body.access_token}}
+
+###
+GET http://{{hostname}}:{{port}}/api/expenses?category=Other
+Authorization: Bearer {{LOGIN.response.body.access_token}}
+
+###
+GET http://localhost:8080/api/expenses?date=2025-02-17
+&category=Other
+Authorization: Bearer {{LOGIN.response.body.access_token}}
+
+###
+DELETE http://localhost:8080/api/expense/6
+Authorization: Bearer {{LOGIN.response.body.access_token}}
+
+###
+PATCH http://localhost:8080/api/expense/5
+Content-Type: application/x-www-form-urlencoded
+Authorization: Bearer {{LOGIN.response.body.access_token}}
+
+amount=2.99
+&description=Stuff
+&category=Other
